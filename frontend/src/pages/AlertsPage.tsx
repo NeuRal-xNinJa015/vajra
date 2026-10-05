@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { Bell } from 'lucide-react'
+import { Bell, Download } from 'lucide-react'
 import { AlertReview } from '@/components/AlertReview'
 import type { Alert, RiskLevel } from '@/lib/api'
+import { downloadText, toCsv } from '@/lib/download'
 import { trackLabel, utcTime } from '@/lib/format'
 import { useAlertsSoFar } from '@/lib/queries'
 import { ALERT_STATUS, RISK } from '@/lib/risk'
@@ -9,6 +10,20 @@ import { cn } from '@/lib/utils'
 import { useUi } from '@/store/ui'
 
 type Filter = 'all' | 'awaiting'
+
+// Column layout shared by the table header and its rows.
+const COLUMNS = 'grid grid-cols-[3.25rem_2.75rem_5rem_1fr] items-center gap-2'
+
+function exportAlerts(alerts: Alert[]) {
+  downloadText(
+    'vajra-alerts.csv',
+    toCsv(
+      ['alert_id', 'cycle_id', 'track_id', 'risk_level', 'status', 'valid_from', 'valid_to', 'reviewed_by', 'reviewed_at', 'headline'],
+      alerts.map((a) => [a.alert_id, a.cycle_id, a.track_id, a.risk_level, a.status, a.valid_from, a.valid_to, a.reviewed_by, a.reviewed_at, a.headline]),
+    ),
+    'text/csv',
+  )
+}
 
 function AlertRow({ alert, active }: { alert: Alert; active: boolean }) {
   const selectAlert = useUi((s) => s.selectAlert)
@@ -20,23 +35,23 @@ function AlertRow({ alert, active }: { alert: Alert; active: boolean }) {
         onClick={() => selectAlert(alert.alert_id)}
         aria-current={active}
         className={cn(
-          'focus-visible:ring-ring flex w-full flex-col gap-1 border-b px-4 py-3 text-left transition-colors outline-none focus-visible:ring-2 focus-visible:ring-inset',
+          'focus-visible:ring-ring flex w-full flex-col gap-1 border-b px-4 py-2.5 text-left transition-colors outline-none focus-visible:ring-2 focus-visible:ring-inset',
           active ? 'bg-accent' : 'hover:bg-accent/50',
         )}
       >
-        <span className="flex items-center gap-2">
-          <span className={cn('rounded-full border px-2 py-0.5 text-[0.65rem] font-medium', RISK[alert.risk_level].badge)}>
-            {RISK[alert.risk_level].label}
+        <span className={COLUMNS}>
+          <span className="font-mono text-xs tabular-nums">{utcTime(alert.valid_from)}</span>
+          <span className="font-mono text-xs font-medium">{alert.track_id ? trackLabel(alert.track_id) : '—'}</span>
+          <span>
+            <span className={cn('rounded border px-1.5 py-0.5 text-[0.65rem] font-medium', RISK[alert.risk_level].badge)}>
+              {RISK[alert.risk_level].label}
+            </span>
           </span>
-          {alert.track_id && <span className="font-mono text-xs font-medium">{trackLabel(alert.track_id)}</span>}
-          <span className={cn('ml-auto text-[0.68rem]', awaiting ? 'text-warn font-medium' : 'text-muted-foreground')}>
+          <span className={cn('text-right text-[0.68rem]', awaiting ? 'text-warn font-medium' : 'text-muted-foreground')}>
             {ALERT_STATUS[alert.status]}
           </span>
         </span>
-        <span className="line-clamp-2 text-[0.8rem] leading-snug">{alert.headline}</span>
-        <span className="text-muted-foreground font-mono text-[0.68rem] tabular-nums">
-          Valid {utcTime(alert.valid_from)}–{utcTime(alert.valid_to)} UTC
-        </span>
+        <span className="text-muted-foreground line-clamp-1 text-[0.72rem] leading-snug">{alert.headline}</span>
       </button>
     </li>
   )
@@ -89,6 +104,22 @@ export default function AlertsPage() {
               </option>
             ))}
           </select>
+          <button
+            type="button"
+            disabled={shown.length === 0}
+            onClick={() => exportAlerts(shown)}
+            title="Export the listed alerts as CSV"
+            aria-label="Export the listed alerts as CSV"
+            className="hover:bg-accent focus-visible:ring-ring flex size-7 shrink-0 items-center justify-center rounded-md border transition-colors outline-none focus-visible:ring-2 disabled:opacity-40"
+          >
+            <Download className="size-3.5" />
+          </button>
+        </div>
+        <div className={cn(COLUMNS, 'text-muted-foreground bg-muted/50 shrink-0 border-b px-4 py-1.5 text-[0.65rem]')}>
+          <span>Time (UTC)</span>
+          <span>Cell</span>
+          <span>Severity</span>
+          <span className="text-right">Status</span>
         </div>
         {shown.length > 0 ? (
           <ul className="min-h-0 flex-1 overflow-y-auto">

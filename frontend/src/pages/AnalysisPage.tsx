@@ -1,5 +1,9 @@
+import { useState } from 'react'
+import { Download } from 'lucide-react'
 import type { ReliabilityBin, SkillRow, Verification } from '@/lib/api'
-import { useVerification } from '@/lib/queries'
+import { downloadText, toCsv } from '@/lib/download'
+import { trackLabel, utcTime } from '@/lib/format'
+import { useStormCells, useVerification } from '@/lib/queries'
 import { cn } from '@/lib/utils'
 
 const TARGETS: { key: SkillRow['target']; title: string }[] = [
@@ -170,21 +174,162 @@ function Target({ data, target, title }: { data: Verification; target: SkillRow[
   )
 }
 
-// Measured skill of the ML nowcast against simpler methods, and how well its
-// probabilities are calibrated. Every number comes from the backend's verification run.
-export default function AnalysisPage() {
-  const { data, isError, error } = useVerification()
+const exportClass =
+  'hover:bg-accent focus-visible:ring-ring flex shrink-0 items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium transition-colors outline-none focus-visible:ring-2'
 
-  if (isError) return <p className="text-muted-foreground p-6 text-xs">{error.message}</p>
-  if (!data) return <p className="text-muted-foreground p-6 text-xs">Loading verification</p>
+function exportSkill(data: Verification) {
+  const rows = data.rows.flatMap((row) =>
+    row.methods.map((m) => [row.target, row.lead_min, m.method, m.csi, m.pod, m.far, m.brier, m.auc, row.cycles, row.cells]),
+  )
+  downloadText(
+    `vajra-verification-${data.event_id}.csv`,
+    toCsv(['target', 'lead_min', 'method', 'csi', 'pod', 'far', 'brier', 'auc', 'cycles', 'grid_cells'], rows),
+    'text/csv',
+  )
+}
+
+const SERIES = [
+  { line: 'stroke-primary', dot: 'bg-primary' },
+  { line: 'stroke-danger', dot: 'bg-danger' },
+  { line: 'stroke-warn', dot: 'bg-warn' },
+  { line: 'stroke-ok', dot: 'bg-ok' },
+  { line: 'stroke-high', dot: 'bg-high' },
+  { line: 'stroke-muted-foreground', dot: 'bg-muted-foreground' },
+]
+
+// Peak reflectivity over time for the strongest cells tracked at the current cycle.
+function StormTrends() {
+  const cells = useStormCells().data?.cells
+  if (!cells) return <p className="text-muted-foreground text-xs">Loading storm cells</p>
+
+  const tracks = cells
+    .map((track) => ({
+      id: track.track_id,
+      points: track.history
+        .filter((h): h is typeof h & { max_dbz: number } => h.max_dbz !== null)
+        .map((h) => ({ t: Date.parse(h.cycle_time), dbz: h.max_dbz })),
+    }))
+    .filter((track) => track.points.length >= 2)
+    .sort((x, y) => Math.max(...y.points.map((p) => p.dbz)) - Math.max(...x.points.map((p) => p.dbz)))
+    .slice(0, SERIES.length)
+
+  if (tracks.length === 0) {
+    return (
+      <p className="text-muted-foreground text-xs leading-relaxed">
+        No cell at this cycle has been tracked for two cycles or more, so there is no trend to draw yet.
+      </p>
+    )
+  }
+
+  const all = tracks.flatMap((track) => track.points)
+  const [t0, t1] = [Math.min(...all.map((p) => p.t)), Math.max(...all.map((p) => p.t))]
+  const low = Math.floor(Math.min(...all.map((p) => p.dbz)) / 5) * 5
+  const high = Math.ceil(Math.max(...all.map((p) => p.dbz)) / 5) * 5
+  const [W, H, L, R, T, B] = [640, 240, 36, 10, 10, 22]
+  const x = (t: number) => L + ((t - t0) / (t1 - t0 || 1)) * (W - L - R)
+  const y = (dbz: number) => T + (1 - (dbz - low) / (high - low || 1)) * (H - T - B)
+  const ticks = Array.from({ length: (high - low) / 5 + 1 }, (_, i) => low + i * 5)
 
   return (
+    <section className="bg-card rounded-lg border">
+      <div className="flex flex-wrap items-baseline justify-between gap-3 border-b px-4 py-2.5">
+        <h2 className={heading}>Peak reflectivity of tracked cells</h2>
+        <ul className="flex flex-wrap gap-x-4 gap-y-1 text-[0.72rem]">
+          {tracks.map((track, i) => (
+            <li key={track.id} className="flex items-center gap-1.5 font-mono">
+              <span className={cn('size-2 rounded-full', SERIES[i].dot)} />
+              {trackLabel(track.id)}
+            </li>
+          ))}
+        </ul>
+      </div>
+      <div className="px-4 py-3">
+        <svg viewBox={`0 0 ${W} ${H}`} className="text-muted-foreground w-full" role="img" aria-label={`Peak reflectivity over time for ${tracks.length} storm cells, between ${low} and ${high} dBZ`}>
+          {ticks.map((tick) => (
+            <g key={tick}>
+              <line x1={L} y1={y(tick)} x2={W - R} y2={y(tick)} className="stroke-border" strokeWidth="1" />
+              <text x={L - 6} y={y(tick) + 3} textAnchor="end" fontSize="10" fill="currentColor">
+                {tick}
+              </text>
+            </g>
+          ))}
+          <text x={L} y={H - 6} fontSize="10" fill="currentColor">
+            {utcTime(new Date(t0).toISOString())}
+          </text>
+          <text x={W - R} y={H - 6} textAnchor="end" fontSize="10" fill="currentColor">
+            {utcTime(new Date(t1).toISOString())} UTC
+          </text>
+          {tracks.map((track, i) => (
+            <polyline
+              key={track.id}
+              points={track.points.map((p) => `${x(p.t).toFixed(1)},${y(p.dbz).toFixed(1)}`).join(' ')}
+              fill="none"
+              className={SERIES[i].line}
+              strokeWidth="2"
+              strokeLinejoin="round"
+            />
+          ))}
+        </svg>
+        <p className="text-muted-foreground mt-1 text-[0.68rem]">
+          dBZ, from when each cell was first tracked up to the current cycle. The strongest {tracks.length} cells are shown.
+        </p>
+      </div>
+    </section>
+  )
+}
+
+const TABS = [
+  { key: 'verification', label: 'Verification' },
+  { key: 'trends', label: 'Storm trends' },
+] as const
+
+export default function AnalysisPage() {
+  const [tab, setTab] = useState<(typeof TABS)[number]['key']>('verification')
+  return (
     <div className="mx-auto max-w-6xl space-y-4 p-5">
-      <div>
+      <div className="flex border-b" role="tablist" aria-label="Analysis">
+        {TABS.map(({ key, label }) => (
+          <button
+            key={key}
+            type="button"
+            role="tab"
+            aria-selected={tab === key}
+            onClick={() => setTab(key)}
+            className={cn(
+              'focus-visible:ring-ring -mb-px border-b-2 px-3.5 py-2 text-[0.8rem] font-medium transition-colors outline-none focus-visible:ring-2',
+              tab === key ? 'border-primary text-primary' : 'text-muted-foreground hover:text-foreground border-transparent',
+            )}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      {tab === 'verification' ? <VerificationView /> : <StormTrends />}
+    </div>
+  )
+}
+
+// Measured skill of the ML nowcast against simpler methods, and how well its
+// probabilities are calibrated. Every number comes from the backend's verification run.
+function VerificationView() {
+  const { data, isError, error } = useVerification()
+
+  if (isError) return <p className="text-muted-foreground text-xs">{error.message}</p>
+  if (!data) return <p className="text-muted-foreground text-xs">Loading verification</p>
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-start gap-4">
+        <div className="min-w-0 flex-1">
         <p className="text-[0.8rem] leading-relaxed">{data.method}</p>
         <p className="text-muted-foreground mt-1 font-mono text-[0.68rem]">
           Model {data.model_version} · event {data.event_id}
         </p>
+        </div>
+        <button type="button" onClick={() => exportSkill(data)} className={exportClass}>
+          <Download className="size-3.5" />
+          Export CSV
+        </button>
       </div>
       <div className="grid gap-4 xl:grid-cols-2">
         {TARGETS.map(({ key, title }) => (

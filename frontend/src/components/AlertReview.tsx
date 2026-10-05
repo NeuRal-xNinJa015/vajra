@@ -1,6 +1,8 @@
 import { useState } from 'react'
+import { Download } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import type { Alert, FeedbackVerdict, RiskLevel } from '@/lib/api'
+import { downloadText } from '@/lib/download'
 import { utcTime } from '@/lib/format'
 import { useAddFeedback, useAlertActions, useFeedback } from '@/lib/queries'
 import { ALERT_STATUS, RISK } from '@/lib/risk'
@@ -184,6 +186,16 @@ export function AlertReview({ alert }: { alert: Alert }) {
         <pre className="bg-muted mt-2 max-h-64 overflow-auto rounded-md p-2.5 font-mono text-[0.65rem] leading-snug select-text">
           {alert.cap_xml}
         </pre>
+        {alert.cap_xml && (
+          <button
+            type="button"
+            onClick={() => downloadText(`${alert.alert_id}.cap.xml`, alert.cap_xml!, 'application/xml')}
+            className="hover:bg-accent focus-visible:ring-ring mt-2 flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium transition-colors outline-none focus-visible:ring-2"
+          >
+            <Download className="size-3.5" />
+            Save CAP XML
+          </button>
+        )}
       </details>
     </div>
   )
