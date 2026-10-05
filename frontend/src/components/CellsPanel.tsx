@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChevronDown, CloudLightning, X } from 'lucide-react'
 import type { Severity, StormCellTrack } from '@/lib/api'
+import { areaLabel, useBoundaries } from '@/lib/boundaries'
 import { compass, duration, trackLabel, utcTime } from '@/lib/format'
 import { useAlertActions, useExplanation, useForecast, useReplay, useStormCells } from '@/lib/queries'
 import { RISK } from '@/lib/risk'
@@ -82,6 +83,13 @@ function CellDetails({ track }: { track: StormCellTrack }) {
   const trackedMin = cycleTime ? (Date.parse(cycleTime) - Date.parse(track.first_seen)) / 60000 : null
 
   const [tab, setTab] = useState<TabKey>('overview')
+  // The administrative area under the cell now, and under its projected positions.
+  const locate = useBoundaries().data?.locate
+  const here = locate ? areaLabel(locate(track.cell.centroid[0], track.cell.centroid[1])) : null
+  const ahead = locate
+    ? track.projections.map((p) => ({ lead: p.lead_time_min, area: areaLabel(locate(p.centroid[0], p.centroid[1])) }))
+    : []
+  const next = ahead.find((step) => step.area !== null && step.area !== here)
 
   return (
     <div className="px-4 py-3.5">
@@ -130,6 +138,11 @@ function CellDetails({ track }: { track: StormCellTrack }) {
         <Stat
           label="Position"
           value={`${Math.abs(cell.centroid[1]).toFixed(2)}°${cell.centroid[1] >= 0 ? 'N' : 'S'} ${Math.abs(cell.centroid[0]).toFixed(2)}°${cell.centroid[0] >= 0 ? 'E' : 'W'}`}
+        />
+        <Stat label="Over" value={here ?? (locate ? 'Outside mapped areas' : '—')} />
+        <Stat
+          label="Heading toward"
+          value={next ? `${next.area} by +${next.lead} min` : ahead.length > 0 && here ? `Stays over ${here}` : '—'}
         />
       </div>
 
@@ -226,6 +239,16 @@ function CellDetails({ track }: { track: StormCellTrack }) {
                   </div>
                 ))}
               </div>
+              {ahead.some((step) => step.area) && (
+                <ul className="mt-2.5 space-y-1 text-[0.72rem]">
+                  {ahead.map((step) => (
+                    <li key={step.lead} className="flex gap-2">
+                      <span className="text-muted-foreground w-9 shrink-0 font-mono">+{step.lead}</span>
+                      <span className="min-w-0 truncate">{step.area ?? 'Outside mapped areas'}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           )}
       {track.projections.length > 0 ? (

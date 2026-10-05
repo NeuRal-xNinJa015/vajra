@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { Feature, FeatureCollection, Position } from 'geojson'
-import { CircleAlert, CloudOff, LoaderCircle, RefreshCw, ServerCrash, TrendingUp } from 'lucide-react'
+import { CircleAlert, CloudOff, Globe, LoaderCircle, LocateFixed, RefreshCw, ServerCrash, TrendingUp } from 'lucide-react'
+import { useBoundaries } from '@/lib/boundaries'
 import {
   Map as MapLibreMap,
   NavigationControl,
@@ -60,7 +61,8 @@ const STYLE: StyleSpecification = {
       id: 'boundary-lines',
       type: 'line',
       source: 'boundaries',
-      paint: { 'line-color': '#3b4a66', 'line-width': 1 },
+      // District outlines are drawn finer than state outlines.
+      paint: { 'line-color': '#3b4a66', 'line-width': ['case', ['has', 'district'], 0.4, 1] },
     },
     {
       id: 'region-fill',
@@ -208,29 +210,7 @@ function MapNotice({ icon, title, children }: { icon: ReactNode; title: string; 
 
 // Map colours that follow the theme. The radar, lightning and probability images
 // come from the backend with fixed colours, so only the base and overlays change.
-// Where to write an area's name: the middle of its largest outline's bounding box.
-function labelPoint(feature: Feature): [number, number] | null {
-  const geometry = feature.geometry
-  const rings: Position[][] =
-    geometry.type === 'Polygon'
-      ? [geometry.coordinates[0]]
-      : geometry.type === 'MultiPolygon'
-        ? geometry.coordinates.map((polygon) => polygon[0])
-        : []
-  let best: [number, number] | null = null
-  let bestArea = 0
-  for (const ring of rings) {
-    const lons = ring.map((point) => point[0])
-    const lats = ring.map((point) => point[1])
-    const [w, e, sLat, n] = [Math.min(...lons), Math.max(...lons), Math.min(...lats), Math.max(...lats)]
-    const area = (e - w) * (n - sLat)
-    if (area > bestArea) {
-      bestArea = area
-      best = [(w + e) / 2, (sLat + n) / 2]
-    }
-  }
-  return best
-}
+const INDIA_VIEW: [[number, number], [number, number]] = [[68, 6.5], [97.5, 37.2]]
 
 const MAP_THEME = {
   dark: { background: '#0a101c', land: '#121a2b', boundary: '#3d4c69', graticule: '#1b2538', region: '#7cb8ff', track: '#67e8f9' },
@@ -287,33 +267,20 @@ export function MapView({ children }: { children?: ReactNode }) {
     return () => instance.remove()
   }, [])
 
-  // Administrative boundaries and their names, from a file shipped with the app.
+  // Administrative boundaries and their names, from files shipped with the app.
   // The map works without them: a failed load leaves the plain background.
+  const boundaries = useBoundaries().data
   useEffect(() => {
-    if (!map) return
-    let cancelled = false
-    const labels: Marker[] = []
-    fetch(`${import.meta.env.BASE_URL}basemap/us-states.geojson`)
-      .then((response) => (response.ok ? (response.json() as Promise<FeatureCollection>) : Promise.reject(response.status)))
-      .then((data) => {
-        if (cancelled) return
-        map.getSource<GeoJSONSource>('boundaries')?.setData(data)
-        for (const feature of data.features) {
-          const centre = labelPoint(feature)
-          const name = feature.properties?.name
-          if (!centre || typeof name !== 'string') continue
-          const element = document.createElement('div')
-          element.className = 'map-area-label'
-          element.textContent = name
-          labels.push(new Marker({ element }).setLngLat(centre).addTo(map))
-        }
-      })
-      .catch(() => undefined)
-    return () => {
-      cancelled = true
-      labels.forEach((label) => label.remove())
-    }
-  }, [map])
+    if (!map || !boundaries) return
+    map.getSource<GeoJSONSource>('boundaries')?.setData(boundaries.collection)
+    const labels = boundaries.labels.map(({ name, at }) => {
+      const element = document.createElement('div')
+      element.className = 'map-area-label'
+      element.textContent = name
+      return new Marker({ element }).setLngLat(at).addTo(map)
+    })
+    return () => labels.forEach((label) => label.remove())
+  }, [map, boundaries])
 
   const [west, south, east, north] = bounds ?? []
   useEffect(() => {
@@ -518,6 +485,30 @@ export function MapView({ children }: { children?: ReactNode }) {
       {layer && <LayerPanel />}
       {layer && radarVisible && (
         <Legend layer={layer} title={LAYER_TITLES[layer.variable] ?? layer.variable} />
+      )}
+      {/* Views: back to the region the data covers, or out to the whole of India. */}
+      {map && (
+        <div className="maplibregl-ctrl-group absolute top-[5.25rem] right-2.5 flex flex-col">
+          <button
+            type="button"
+            disabled={!bounds}
+            onClick={() => bounds && map.fitBounds([[bounds[0], bounds[1]], [bounds[2], bounds[3]]], { padding: { top: 24, bottom: 124, left: 24, right: 24 }, duration: 600 })}
+            title="Show the region the data covers"
+            aria-label="Show the region the data covers"
+            className="text-foreground flex size-[29px] items-center justify-center"
+          >
+            <LocateFixed className="size-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => map.fitBounds(INDIA_VIEW, { padding: 24, duration: 600 })}
+            title="Show India"
+            aria-label="Show India"
+            className="text-foreground flex size-[29px] items-center justify-center"
+          >
+            <Globe className="size-4" />
+          </button>
+        </div>
       )}
       {children}
 
