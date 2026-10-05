@@ -8,7 +8,8 @@ export function useHealth() {
   return useQuery({
     queryKey: ['health'],
     queryFn: api.health,
-    refetchInterval: 3000,
+    // Asked often until the engine first answers, so the app is ready as soon as it is up.
+    refetchInterval: (query) => (query.state.data ? 3000 : 500),
     retry: false,
   })
 }

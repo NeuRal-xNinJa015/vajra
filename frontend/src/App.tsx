@@ -1,33 +1,39 @@
 import { useEffect } from 'react'
 import { HashRouter } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
-import { LoaderCircle, Zap } from 'lucide-react'
 import { AppShell } from '@/app/AppShell'
 import { useHealth } from '@/lib/queries'
 import { useSession } from '@/lib/session'
 import { LoginPage } from '@/pages/LoginPage'
 
-// Shown until the forecast engine has answered once; the health check keeps retrying.
-function EngineWait({ failed }: { failed: boolean }) {
-  return (
-    <div className="bg-sidebar flex h-screen flex-col items-center justify-center gap-3 text-center">
-      <div className="bg-primary/15 ring-primary/40 flex size-11 items-center justify-center rounded-lg ring-1">
-        <Zap className="text-primary size-6 fill-current" />
-      </div>
-      <div className="text-lg font-semibold tracking-[0.22em]">VAJRA</div>
-      <div className="text-muted-foreground flex items-center gap-2 text-xs" role="status">
-        <LoaderCircle className="size-3.5 animate-spin" />
-        {failed ? 'The forecast engine is not responding. Retrying.' : 'Starting the forecast engine'}
-      </div>
-    </div>
-  )
+const AUTH_KEY = 'vajra-auth-required'
+
+// Whether the engine required sign-in the last time it answered. Used while it is
+// still starting, so the sign-in screen can open at once. Sign-in is assumed until
+// the engine says otherwise.
+function rememberedAuthRequired(): boolean {
+  try {
+    return localStorage.getItem(AUTH_KEY) !== '0'
+  } catch {
+    return true
+  }
 }
 
 function App() {
   const health = useHealth()
   const signedIn = useSession((s) => s.token !== null)
   const client = useQueryClient()
-  const authRequired = health.data?.auth_required
+  const authRequired = health.data?.auth_required ?? rememberedAuthRequired()
+  const answered = health.data?.auth_required
+
+  useEffect(() => {
+    if (answered === undefined) return
+    try {
+      localStorage.setItem(AUTH_KEY, answered ? '1' : '0')
+    } catch {
+      // Storage unavailable: sign-in is assumed at the next start.
+    }
+  }, [answered])
 
   // When a session ends, nothing fetched under it is kept for the next user.
   useEffect(() => {
@@ -37,8 +43,7 @@ function App() {
     }
   }, [authRequired, signedIn, client])
 
-  if (!health.data) return <EngineWait failed={health.isError} />
-  if (authRequired && !signedIn) return <LoginPage version={health.data.version} />
+  if (authRequired && !signedIn) return <LoginPage version={health.data?.version} />
 
   return (
     <HashRouter>

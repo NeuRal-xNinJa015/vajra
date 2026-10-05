@@ -8,7 +8,24 @@ import { useUi } from '@/store/ui'
 const field =
   'bg-background focus:border-primary focus:ring-ring h-10 w-full rounded-md border px-3 text-sm outline-none select-text focus:ring-2 disabled:opacity-60'
 
-export function LoginPage({ version }: { version: string }) {
+// The engine takes a few seconds to start with the app. A sign-in sent before it is
+// up waits for it this long before reporting that it cannot be reached.
+const ENGINE_WAIT_MS = 45000
+
+async function signIn(username: string, password: string) {
+  const deadline = Date.now() + ENGINE_WAIT_MS
+  for (;;) {
+    try {
+      return await api.login(username, password)
+    } catch (err) {
+      // A TypeError means no answer at all; anything else is the engine's own refusal.
+      if (!(err instanceof TypeError) || Date.now() > deadline) throw err
+      await new Promise((resolve) => setTimeout(resolve, 700))
+    }
+  }
+}
+
+export function LoginPage({ version }: { version?: string }) {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -25,7 +42,7 @@ export function LoginPage({ version }: { version: string }) {
     setBusy(true)
     setError(null)
     try {
-      const { token, user } = await api.login(username.trim(), password)
+      const { token, user } = await signIn(username.trim(), password)
       // Decisions are recorded under the signed-in name.
       useUi.getState().setForecaster(user.display_name)
       useSession.getState().start(token, user)
@@ -104,7 +121,7 @@ export function LoginPage({ version }: { version: string }) {
         <p className="text-muted-foreground mt-4 text-center text-[0.7rem] leading-relaxed">
           Accounts are issued by your administrator.
           <br />
-          <span className="font-mono">Engine {version}</span>
+          {version && <span className="font-mono">Engine {version}</span>}
         </p>
       </div>
     </div>
