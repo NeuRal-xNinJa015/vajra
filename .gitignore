@@ -1,0 +1,16 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Data, trained models and the local database (holds user accounts); not in the repository
+data/
+
+# Frontend and desktop build output
+node_modules/
+dist/
+frontend/src-tauri/target/
+
+# Local files
+*.log
+.DS_Store

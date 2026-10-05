@@ -1,0 +1,136 @@
+# ============================================
+# VAJRA V1 — configuration
+# Region is configuration, not code. Changing region = editing this file only.
+# ============================================
+
+region:
+  # Stand-in development region: 250 km around the open-data radar KDMX.
+  # Replace with the operational region when its data is supplied.
+  name: CENTRAL_IOWA
+  bounds:
+    west: -96.75
+    south: 39.5
+    east: -90.75
+    north: 44.0
+
+grid:
+  # Regular lat/lon grid; cell size in km is converted to degrees at the region centre.
+  resolution_km: 2.0
+
+cycle:
+  # The stand-in radar completes a volume every 6-7 minutes, so 10-minute cycles
+  # always have a new volume.
+  interval_min: 10
+  # A cycle with no observation newer than this is stored as "no data".
+  max_data_age_min: 15
+  lead_times_min: [30, 60, 90, 120]
+
+radar:
+  format: nexradlevel2
+  reflectivity_field: DBZH
+  # Dual-polarisation correlation coefficient, used to reject non-weather echo.
+  # Set to null for a radar that does not provide it.
+  correlation_field: RHOHV
+  rhohv_min: 0.80
+  max_range_km: 300
+  # Echo regions smaller than this many grid cells are rejected as speckle.
+  speckle_min_cells: 4
+
+lightning:
+  format: glm_l2
+  # A cycle counts as observed only if this fraction of its time window has data.
+  min_coverage: 0.8
+  # The sensor locates a flash to roughly this distance; the map shows flashes
+  # within it, and later phases use it as the neighbourhood size.
+  footprint_km: 10
+
+satellite:
+  # Infrared brightness temperature (cloud-top temperature).
+  format: abi_l2_cmip
+
+nwp:
+  format: hrrr_grib2
+  # A model run is not used until this long after its start time, which is
+  # roughly when its output would have been available to a forecaster.
+  availability_delay_min: 90
+
+nowcast:
+  # Reflectivity below this is treated as no echo by the nowcast.
+  echo_threshold_dbz: 5
+  # Reflectivity at or above this counts as a storm for the probability product.
+  storm_threshold_dbz: 35
+  ensemble_members: 20
+  cascade_levels: 6
+  # The three radar scans a forecast is built from must all be this recent.
+  history_max_age_min: 45
+  # Fixed seed so a replay always produces the same forecasts.
+  seed: 26072
+
+ml:
+  # Training rows are sampled down to this many, for speed.
+  max_training_rows: 300000
+  trees: 200
+  learning_rate: 0.05
+  # Fixed seed so training is reproducible.
+  seed: 26072
+
+cells:
+  # A storm cell is a connected area at or above this reflectivity (a convective core).
+  core_threshold_dbz: 45
+  min_area_km2: 60
+  # A cell keeps its track only if found within this distance of its expected position.
+  max_match_km: 30
+  # Severity by peak reflectivity: below `strong_dbz` is moderate.
+  strong_dbz: 50
+  severe_dbz: 60
+
+risk:
+  # Risk = how intense the cell is now x how likely storm or lightning is over the
+  # alert period. Likelihood is the highest probability along the cell's projected track.
+  likelihood_medium: 0.3
+  likelihood_high: 0.6
+
+alerts:
+  # How far ahead a suggested alert is valid.
+  valid_min: 60
+  # Alerts are suggested automatically for cells at or above this risk level.
+  # A forecaster can still request an alert for any cell.
+  suggest_from: severe
+  # Identifiers written into the CAP preview. Nothing is ever sent anywhere.
+  sender: vajra@localhost
+  sender_name: VAJRA Nowcasting Console
+
+# Historical storm events available for replay. Times are UTC.
+events:
+  # Source: NOAA NEXRAD Level II open data (bucket unidata-nexrad-level2),
+  # radar KDMX, volumes 2020-08-10 15:01 to 17:57 UTC.
+  - id: us_iowa_20200810
+    start: "2020-08-10T15:10:00Z"
+    end: "2020-08-10T18:00:00Z"
+
+auth:
+  # When true, every request except the health check and sign-in needs a signed-in
+  # user. Accounts are created with: python -m vajra.users add <user-id> --name "Full Name"
+  required: true
+  # When true the sign-in screen accepts ANY user ID and password: nothing is checked,
+  # and whoever signs in gets the forecaster role. Set to false to require real accounts.
+  open_access: true
+  session_hours: 12
+  # After this many wrong passwords in a row an account is locked for lockout_min.
+  max_failed_attempts: 5
+  lockout_min: 15
+
+server:
+  host: 127.0.0.1
+  port: 8756
+
+paths:
+  # Relative paths are resolved against the project root.
+  data_dir: data
+
+# Raw historical input folders (relative to data_dir).
+sources:
+  radar: raw/radar          # one sub-folder per radar; folder name = radar id
+  satellite: raw/satellite
+  lightning: raw/lightning
+  model: raw/model
