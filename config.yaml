@@ -114,7 +114,7 @@ auth:
   required: true
   # When true the sign-in screen accepts ANY user ID and password: nothing is checked,
   # and whoever signs in gets the forecaster role. Set to false to require real accounts.
-  open_access: true
+  open_access: false
   session_hours: 12
   # After this many wrong passwords in a row an account is locked for lockout_min.
   max_failed_attempts: 5
