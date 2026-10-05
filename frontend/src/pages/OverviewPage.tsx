@@ -1,12 +1,14 @@
-import type { ReactNode } from 'react'
+import { useEffect, useState, type ComponentType, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { Bell, CloudLightning, TriangleAlert, Zap } from 'lucide-react'
 import { CurrentCycle, NowcastSection } from '@/components/Sidebar'
-import type { RiskLevel } from '@/lib/api'
+import { backendRequestHeaders, type RiskLevel } from '@/lib/api'
 import { trackLabel, utcTime } from '@/lib/format'
 import {
   useAlertsSoFar,
   useDataStatus,
   useLightning,
+  useObservation,
   useReplay,
   useReplayControls,
   useStatus,
@@ -34,20 +36,77 @@ function Card({ title, action, children }: { title: string; action?: ReactNode; 
 }
 
 // One headline number. `tone` colours it only when it needs attention.
-function Tile({ label, value, note, tone }: { label: string; value: string; note: string; tone?: 'danger' | 'warn' }) {
+function Tile({
+  icon: Icon,
+  label,
+  value,
+  note,
+  tone,
+}: {
+  icon: ComponentType<{ className?: string }>
+  label: string
+  value: string
+  note: string
+  tone?: 'danger' | 'warn'
+}) {
   return (
-    <div className="bg-card rounded-lg border px-4 py-3">
-      <div className="text-muted-foreground text-[0.68rem] font-semibold tracking-[0.12em] uppercase">{label}</div>
+    <div className="bg-card flex items-start gap-3 rounded-lg border px-4 py-3">
       <div
         className={cn(
-          'mt-1.5 font-mono text-2xl leading-none font-semibold tabular-nums',
-          tone === 'danger' && 'text-danger',
-          tone === 'warn' && 'text-warn',
+          'mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-md',
+          tone === 'danger' ? 'bg-danger/10 text-danger' : tone === 'warn' ? 'bg-warn/10 text-warn' : 'bg-primary/10 text-primary',
         )}
       >
-        {value}
+        <Icon className="size-[1.1rem]" />
       </div>
-      <div className="text-muted-foreground mt-1.5 text-[0.7rem]">{note}</div>
+      <div className="min-w-0">
+        <div className="text-muted-foreground truncate text-[0.7rem]">{label}</div>
+        <div className="mt-0.5 font-mono text-2xl leading-none font-semibold tabular-nums">{value}</div>
+        <div className="text-muted-foreground mt-1.5 truncate text-[0.68rem]">{note}</div>
+      </div>
+    </div>
+  )
+}
+
+// The radar field at the current cycle, as rendered by the backend. A still image,
+// so the dashboard does not carry a second map.
+function RadarPreview() {
+  const layer = useObservation().data
+  const url = layer?.obs_time ? layer.image_url : null
+  const [image, setImage] = useState<{ url: string; src: string } | null>(null)
+
+  useEffect(() => {
+    if (!url) return
+    let cancelled = false
+    let src: string | null = null
+    fetch(url, { headers: backendRequestHeaders(url) })
+      .then((response) => (response.ok ? response.blob() : Promise.reject(response.status)))
+      .then((blob) => {
+        if (cancelled) return
+        src = URL.createObjectURL(blob)
+        setImage({ url, src })
+      })
+      .catch(() => undefined)
+    return () => {
+      cancelled = true
+      if (src) URL.revokeObjectURL(src)
+    }
+  }, [url])
+
+  if (!layer) return <p className={emptyClass}>Loading the radar field</p>
+  if (!url) return <p className={emptyClass}>No radar observation for this cycle.</p>
+  const shown = image?.url === url ? image.src : null
+
+  return (
+    <div className="relative flex h-56 items-center justify-center bg-[#0a101c]">
+      {shown ? (
+        <img src={shown} alt="Radar reflectivity at the current cycle" className="h-full w-full object-contain" />
+      ) : (
+        <span className="text-xs text-white/50">Loading the radar field</span>
+      )}
+      <span className="absolute top-2 right-2 rounded bg-black/60 px-1.5 py-0.5 font-mono text-[0.68rem] text-white tabular-nums">
+        {utcTime(layer.valid_time)} UTC
+      </span>
     </div>
   )
 }
@@ -67,7 +126,7 @@ function LightningActivity() {
 
   return (
     <div className="px-4 pt-4 pb-3">
-      <div className="flex h-28 items-end gap-1">
+      <div className="flex h-44 items-end gap-1">
         {timeline.cycles.map((cycle, i) => {
           const count = counts[i]
           const label =
@@ -135,30 +194,34 @@ export default function OverviewPage() {
   return (
     <div className="mx-auto grid max-w-5xl gap-4 p-5 lg:grid-cols-2">
       <div className="grid grid-cols-2 gap-4 lg:col-span-2 lg:grid-cols-4">
-        <Tile label="Storm cells" value={cells ? String(cells.length) : '—'} note="Tracked at this cycle" />
+        <Tile icon={CloudLightning} label="Storm cells" value={cells ? String(cells.length) : '—'} note="Tracked at this cycle" />
         <Tile
+          icon={TriangleAlert}
           label="High or severe risk"
           value={highRisk !== undefined ? String(highRisk) : '—'}
           note="Cells at this cycle"
           tone={highRisk ? 'danger' : undefined}
         />
         <Tile
+          icon={Zap}
           label="Lightning flashes"
           value={flashes !== undefined ? flashes.toLocaleString('en') : '—'}
           note={flashes !== undefined && interval ? `In the last ${interval} min` : 'No lightning data for this cycle'}
         />
         <Tile
+          icon={Bell}
           label="Alerts awaiting review"
           value={loading ? '—' : String(awaiting.length)}
           note="Up to this cycle"
           tone={awaiting.length ? 'warn' : undefined}
         />
       </div>
-      <div className="lg:col-span-2">
-        <Card title="Lightning activity by cycle">
-          <LightningActivity />
-        </Card>
-      </div>
+      <Card title="Radar at this cycle" action={<Link to="/" className={linkClass}>Open map</Link>}>
+        <RadarPreview />
+      </Card>
+      <Card title="Lightning activity by cycle">
+        <LightningActivity />
+      </Card>
 
       <div className="bg-card overflow-hidden rounded-lg border [&>section]:border-b-0">
         <CurrentCycle />

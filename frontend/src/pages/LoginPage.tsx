@@ -55,20 +55,45 @@ export function LoginPage({ version }: { version?: string }) {
   }
 
   return (
-    <div className="bg-sidebar flex h-screen items-center justify-center p-6">
-      <div className="w-full max-w-sm">
-        <div className="mb-6 flex flex-col items-center text-center">
-          <div className="bg-primary/15 ring-primary/40 mb-3 flex size-11 items-center justify-center rounded-lg ring-1">
-            <Zap className="text-primary size-6 fill-current" />
+    <div className="bg-background flex h-screen items-center justify-center p-6">
+      <div className="bg-card grid w-full max-w-3xl overflow-hidden rounded-xl border shadow-lg md:grid-cols-[5fr_6fr]">
+        {/* Brand panel: always dark, in both themes. */}
+        <div className="relative hidden min-h-[26rem] flex-col justify-end overflow-hidden bg-[#0b132b] p-8 text-white md:flex">
+          <svg className="absolute inset-0 size-full" viewBox="0 0 400 520" preserveAspectRatio="xMidYMid slice" aria-hidden>
+            <defs>
+              <radialGradient id="login-glow" cx="30%" cy="105%" r="85%">
+                <stop offset="0%" stopColor="#2563eb" stopOpacity="0.55" />
+                <stop offset="55%" stopColor="#1e3a8a" stopOpacity="0.25" />
+                <stop offset="100%" stopColor="#0b132b" stopOpacity="0" />
+              </radialGradient>
+            </defs>
+            <rect width="400" height="520" fill="url(#login-glow)" />
+            {[150, 230, 310, 390, 470].map((r) => (
+              <circle key={r} cx="120" cy="560" r={r} fill="none" stroke="#60a5fa" strokeOpacity="0.14" />
+            ))}
+            {[60, 140, 220, 300].map((x) => (
+              <line key={x} x1={x} y1="0" x2={x + 80} y2="520" stroke="#60a5fa" strokeOpacity="0.06" />
+            ))}
+          </svg>
+          <div className="relative flex items-center gap-3">
+            <Zap className="size-11 fill-current text-[#60a5fa]" />
+            <div>
+              <div className="text-3xl leading-none font-bold tracking-[0.06em]">VAJRA</div>
+              <div className="mt-2 text-sm leading-snug text-white/75">
+                Nowcasting for
+                <br />
+                Thunderstorm &amp; Lightning
+              </div>
+            </div>
           </div>
-          <div className="text-lg font-semibold tracking-[0.22em]">VAJRA</div>
-          <div className="text-muted-foreground mt-1 text-xs">Thunderstorm &amp; Lightning Nowcasting</div>
         </div>
 
-        <form onSubmit={submit} noValidate className="bg-card rounded-xl border p-6 shadow-sm">
-          <h1 className="text-sm font-semibold">Sign in</h1>
+        <div className="flex flex-col justify-center p-8">
+        <form onSubmit={submit} noValidate>
+          <h1 className="text-xl font-semibold">Sign In</h1>
+          <p className="text-muted-foreground mt-0.5 text-xs">Access VAJRA</p>
 
-          <label className="mt-4 block text-xs font-medium" htmlFor="login-user">
+          <label className="mt-6 block text-xs font-medium" htmlFor="login-user">
             User ID
           </label>
           <input
@@ -76,6 +101,7 @@ export function LoginPage({ version }: { version?: string }) {
             className={`${field} mt-1.5`}
             value={username}
             onChange={(e) => setUsername(e.target.value)}
+            placeholder="Enter user ID"
             autoComplete="username"
             autoCapitalize="none"
             spellCheck={false}
@@ -93,6 +119,7 @@ export function LoginPage({ version }: { version?: string }) {
               type={showPassword ? 'text' : 'password'}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              placeholder="Enter password"
               autoComplete="current-password"
               disabled={busy}
             />
@@ -114,15 +141,15 @@ export function LoginPage({ version }: { version?: string }) {
 
           <Button type="submit" className="mt-2 h-10 w-full" disabled={busy}>
             {busy && <LoaderCircle className="animate-spin" />}
-            {busy ? 'Signing in' : 'Sign in'}
+            {busy ? 'Signing in' : 'Sign In'}
           </Button>
         </form>
 
-        <p className="text-muted-foreground mt-4 text-center text-[0.7rem] leading-relaxed">
-          Accounts are issued by your administrator.
-          <br />
-          {version && <span className="font-mono">Engine {version}</span>}
-        </p>
+          <p className="text-muted-foreground mt-5 text-[0.7rem] leading-relaxed">
+            Accounts are issued by your administrator.
+            {version && <span className="ml-2 font-mono">Engine {version}</span>}
+          </p>
+        </div>
       </div>
     </div>
   )

@@ -86,10 +86,8 @@ export function NavSidebar() {
       )}
     >
       <div className="flex h-12 shrink-0 items-center gap-2.5 px-3.5">
-        <div className="bg-primary/15 ring-primary/40 flex size-7 shrink-0 items-center justify-center rounded-md ring-1">
-          <Zap className="text-primary size-4 fill-current" />
-        </div>
-        {!collapsed && <span className="text-[0.95rem] font-semibold tracking-[0.22em]">VAJRA</span>}
+        <Zap className="text-primary size-6 shrink-0 fill-current" />
+        {!collapsed && <span className="text-base font-bold tracking-[0.08em]">VAJRA</span>}
       </div>
 
       <ul className="flex-1 space-y-0.5 px-2 py-2">
@@ -105,7 +103,7 @@ export function NavSidebar() {
                   cn(
                     'focus-visible:ring-ring relative flex h-9 items-center gap-3 rounded-md px-2.5 text-[0.8rem] transition-colors outline-none focus-visible:ring-2',
                     isActive
-                      ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
+                      ? 'bg-primary/10 text-primary font-medium'
                       : 'text-muted-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-foreground',
                   )
                 }

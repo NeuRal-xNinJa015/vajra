@@ -1,4 +1,4 @@
-import { Layers } from 'lucide-react'
+import { Check, Layers } from 'lucide-react'
 import { useShallow } from 'zustand/react/shallow'
 import { useLightning } from '@/lib/queries'
 import { cn } from '@/lib/utils'
@@ -8,21 +8,16 @@ function Switch({ checked, onChange, label }: { checked: boolean; onChange: (on:
   return (
     <button
       type="button"
-      role="switch"
+      role="checkbox"
       aria-checked={checked}
       aria-label={label}
       onClick={() => onChange(!checked)}
       className={cn(
-        'focus-visible:ring-ring relative h-4 w-7 shrink-0 rounded-full transition-colors outline-none focus-visible:ring-2',
-        checked ? 'bg-primary' : 'bg-muted',
+        'focus-visible:ring-ring flex size-4 shrink-0 items-center justify-center rounded-[4px] border transition-colors outline-none focus-visible:ring-2',
+        checked ? 'border-primary bg-primary text-primary-foreground' : 'border-input bg-background',
       )}
     >
-      <span
-        className={cn(
-          'absolute top-0.5 left-0.5 size-3 rounded-full bg-white shadow transition-transform',
-          checked && 'translate-x-3',
-        )}
-      />
+      {checked && <Check className="size-3" strokeWidth={3} />}
     </button>
   )
 }
@@ -47,15 +42,15 @@ export function LayerPanel() {
   const lightning = useLightning().data
 
   return (
-    <div className="bg-card/90 absolute top-3 right-3 w-60 rounded-lg border shadow-md backdrop-blur">
+    <div className="bg-card/90 absolute top-3 left-3 w-56 rounded-lg border shadow-md backdrop-blur">
       <div className="text-muted-foreground flex items-center gap-2 border-b px-3 py-2 text-[0.68rem] font-semibold tracking-[0.12em] uppercase">
         <Layers className="size-3.5" />
         Layers
       </div>
       <div className="space-y-2.5 px-3 py-2.5">
-        <div className="flex items-center justify-between gap-3 text-xs">
-          <span className={cn(!radarVisible && 'text-muted-foreground')}>Reflectivity</span>
+        <div className="flex items-center gap-2.5 text-xs">
           <Switch checked={radarVisible} onChange={setRadarVisible} label="Show reflectivity" />
+          <span className={cn(!radarVisible && 'text-muted-foreground')}>Reflectivity</span>
         </div>
         <div className="flex items-center gap-2.5">
           <span className="text-muted-foreground text-[0.65rem]">Opacity</span>
@@ -76,10 +71,10 @@ export function LayerPanel() {
         </div>
         {lightning && (
           <div className="border-t pt-2.5">
-            <div className="flex items-center justify-between gap-3 text-xs">
-              <span className={cn(!lightningVisible && 'text-muted-foreground')}>Lightning</span>
-              <Switch checked={lightningVisible} onChange={setLightningVisible} label="Show lightning" />
-            </div>
+            <div className="flex items-center gap-2.5 text-xs">
+          <Switch checked={lightningVisible} onChange={setLightningVisible} label="Show lightning" />
+          <span className={cn(!lightningVisible && 'text-muted-foreground')}>Lightning</span>
+        </div>
             {/* Compact colour scale: the lower bound of each band. */}
             <div className="text-muted-foreground mt-1.5 flex items-center gap-1.5 text-[0.62rem]">
               {lightning.legend.map((entry) => (
@@ -92,9 +87,9 @@ export function LayerPanel() {
             <div className="text-muted-foreground mt-0.5 text-[0.62rem]">{lightning.units}, last cycle</div>
           </div>
         )}
-        <div className="flex items-center justify-between gap-3 border-t pt-2.5 text-xs">
-          <span className={cn(!cellsVisible && 'text-muted-foreground')}>Storm cells</span>
+        <div className="flex items-center gap-2.5 border-t pt-2.5 text-xs">
           <Switch checked={cellsVisible} onChange={setCellsVisible} label="Show storm cells" />
+          <span className={cn(!cellsVisible && 'text-muted-foreground')}>Storm cells</span>
         </div>
       </div>
     </div>

@@ -213,6 +213,21 @@ function CellDetails({ track }: { track: StormCellTrack }) {
 
       {tab === 'forecast' && (
         <>
+          {track.projections.length > 0 && (
+            <div className="mt-4">
+              <div className="text-muted-foreground mb-1.5 text-[0.65rem]">Lightning probability by lead time (ML model)</div>
+              <div className="grid grid-cols-4 gap-1.5">
+                {track.projections.map((p) => (
+                  <div key={p.lead_time_min} className="rounded-md border px-1 py-1.5 text-center">
+                    <div className="text-muted-foreground font-mono text-[0.62rem]">+{p.lead_time_min} min</div>
+                    <div className="mt-0.5 text-sm font-semibold tabular-nums">
+                      {p.ml_lightning_probability !== null ? `${(p.ml_lightning_probability * 100).toFixed(0)}%` : '—'}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
       {track.projections.length > 0 ? (
         <div className="mt-4">
           <div className="text-muted-foreground mb-1.5 flex justify-between text-[0.65rem]">
@@ -292,9 +307,9 @@ export function CellList() {
   const [open, setOpen] = useState(true)
   if (!cells) return null
 
-    // Sits below the row where the map shows its forecast or data notice.
+    // Top right, beside the zoom control; the layer list has the top left.
   return (
-    <div className="bg-card/90 absolute top-12 left-14 w-60 rounded-lg border shadow-md backdrop-blur">
+    <div className="bg-card/90 absolute top-3 right-14 w-60 rounded-lg border shadow-md backdrop-blur">
       <button
         type="button"
         onClick={() => setOpen(!open)}

@@ -279,7 +279,7 @@ export function MapView({ children }: { children?: ReactNode }) {
       // Backend images need the sign-in header when sign-in is on.
       transformRequest: (url) => ({ url, headers: backendRequestHeaders(url) }),
     })
-    instance.addControl(new NavigationControl({ showCompass: false }), 'top-left')
+    instance.addControl(new NavigationControl({ showCompass: false }), 'top-right')
     instance.addControl(new ScaleControl({ unit: 'metric' }), 'bottom-right')
     instance.on('mousemove', (event) => setCursor(event.lngLat))
     instance.on('mouseout', () => setCursor(null))
@@ -522,7 +522,7 @@ export function MapView({ children }: { children?: ReactNode }) {
       {children}
 
       {notice ? (
-        <div className="border-warn/40 bg-card/90 text-warn absolute top-3.5 left-14 flex max-w-[26rem] items-center gap-2 rounded-full border px-3 py-1 text-xs backdrop-blur">
+        <div className="border-warn/40 bg-card/90 text-warn absolute top-3.5 left-1/2 -translate-x-1/2 flex max-w-[26rem] items-center gap-2 rounded-full border px-3 py-1 text-xs backdrop-blur">
           <CircleAlert className="size-3.5 shrink-0" />
           {notice}
         </div>
@@ -530,7 +530,7 @@ export function MapView({ children }: { children?: ReactNode }) {
         isForecast &&
         layer && (
           // A forecast must never be mistaken for an observation.
-          <div className="border-primary/40 bg-card/90 text-primary absolute top-3.5 left-14 flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium backdrop-blur">
+          <div className="border-primary/40 bg-card/90 text-primary absolute top-3.5 left-1/2 -translate-x-1/2 flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium backdrop-blur">
             <TrendingUp className="size-3.5" />
             Forecast +{layer.lead_time_min} min · valid {utcTime(layer.valid_time)} UTC
           </div>
